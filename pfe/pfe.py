@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Pietro Barbiero, Alberto Tonda and Giovanni Squillero
+# Copyright 2020 Pietro Barbiero, Alberto Tonda and Giovanni Squillero
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.
