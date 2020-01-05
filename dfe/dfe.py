@@ -17,19 +17,16 @@
 
 import numpy as np
 from sklearn import clone
-from sklearn.feature_selection import RFE
+from sklearn.feature_selection import RFE, mutual_info_regression, mutual_info_classif, SelectKBest
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.utils import check_X_y, safe_sqr
 
 
-class PFE(RFE):
+class DFE(RFE):
 
-    def __init__(self, estimator, regression_estimator=LinearRegression(),
-                 classification_estimator=LogisticRegression(), base_score=1.0,
-                 n_features_to_select=None, verbose=0):
-        super().__init__(estimator=estimator, n_features_to_select=n_features_to_select, step=1, verbose=verbose)
-        self.regression_estimator = regression_estimator
-        self.classification_estimator = classification_estimator
+    def __init__(self, estimator, base_score=1.0, n_features_to_select=None, verbose=0):
+        super().__init__(estimator, n_features_to_select, verbose)
+        self.verbose = verbose
         self.base_score = base_score
 
     def _fit(self, X, y, step_score=None):
@@ -46,13 +43,6 @@ class PFE(RFE):
         else:
             n_features_to_select = self.n_features_to_select
 
-        if 0.0 < self.step < 1.0:
-            step = int(max(1, self.step * n_features))
-        else:
-            step = int(self.step)
-        if step <= 0:
-            raise ValueError("Step must be >0")
-
         support_ = np.ones(n_features, dtype=np.bool)
         ranking_ = np.ones(n_features, dtype=np.int)
 
@@ -62,31 +52,15 @@ class PFE(RFE):
         # Remaining features
         features = np.arange(n_features)[support_]
 
-        # Rank the remaining features
-        estimator = clone(self.estimator)
-
         if self.verbose > 0:
-            print("Fitting estimator with %d features." % n_features)
-        estimator.fit(X, y)
+            print("Computing MI with %d features." % n_features)
 
-        # Get coefs
-        if hasattr(estimator, 'coef_'):
-            coefs = estimator.coef_
-        else:
-            coefs = getattr(estimator, 'feature_importances_', None)
-        if coefs is None:
-            raise RuntimeError('The classifier does not expose '
-                               '"coef_" or "feature_importances_" '
-                               'attributes')
+        skb = SelectKBest(score_func=mutual_info_classif, k=1)
+        skb.fit(X, y)
+        coefs = skb.scores_
 
         # Get ranks
-        if coefs.ndim > 1:
-            ranks = np.argsort(safe_sqr(coefs).sum(axis=0))
-        else:
-            ranks = np.argsort(safe_sqr(coefs))
-
-        # for sparse case ranks is matrix
-        ranks = np.ravel(ranks)
+        ranks = np.argsort(safe_sqr(coefs))
 
         worst_feature = 0
         if n_samples < np.sum(support_):
@@ -102,8 +76,6 @@ class PFE(RFE):
             # Compute step score on the previous selection iteration
             # because 'estimator' must use features
             # that have not been eliminated yet
-            if step_score:
-                self.scores_.append(step_score(estimator, features))
             support_[features[ranks][:threshold + 1]] = False
             ranking_[np.logical_not(support_)] += 1
 
@@ -119,21 +91,24 @@ class PFE(RFE):
             # Remaining features
             features = np.arange(n_features)[support_]
 
-            if np.all(_is_integer(X_worse)):
-                # Classification problem
-                estimator = clone(self.classification_estimator)
-            else:
-                # Regression problem
-                estimator = clone(self.regression_estimator)
-
             # Eliminate predictable features
             if self.verbose > 0:
                 print("Iteration %d: worst: %d" % (i, worst_feature))
                 i += 1
-                print("Fitting estimator with %d features." % np.sum(support_))
+                print("Selected features: %d." % np.sum(support_))
 
-            estimator.fit(X[:, features], X_worse)
-            score = estimator.score(X[:, features], X_worse)
+            # Classification problem
+            try:
+                skb = SelectKBest(score_func=mutual_info_classif, k=1)
+                skb.fit(X[:, features], X_worse)
+                score = skb.scores_
+            except ValueError:
+                skb = SelectKBest(score_func=mutual_info_regression, k=1)
+                skb.fit(X[:, features], X_worse)
+                score = skb.scores_
+
+            # score /= np.max(score)
+            score = np.max(score)
 
             worst_feature += 1
 
@@ -142,8 +117,6 @@ class PFE(RFE):
                 # Compute step score on the previous selection iteration
                 # because 'estimator' must use features
                 # that have not been eliminated yet
-                if step_score:
-                    self.scores_.append(step_score(estimator, features))
                 support_[ranks[worst_feature]] = False
                 ranking_[np.logical_not(support_)] += 1
 
