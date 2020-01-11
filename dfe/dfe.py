@@ -16,18 +16,25 @@
 # limitations under the License.
 
 import numpy as np
+import pandas as pd
 from sklearn import clone
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.feature_selection import RFE, mutual_info_regression, mutual_info_classif, SelectKBest
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.utils import check_X_y, safe_sqr
 
 
 class DFE(RFE):
 
-    def __init__(self, estimator, base_score=1.0, n_features_to_select=None, verbose=0):
+    def __init__(self, estimator, base_score=0.9, n_splits=10, random_state=42,
+                 n_features_to_select=None, verbose=0):
         super().__init__(estimator, n_features_to_select, verbose)
         self.verbose = verbose
         self.base_score = base_score
+        self.n_splits = n_splits
+        self.random_state = random_state
 
     def _fit(self, X, y, step_score=None):
         # Parameter step_score controls the calculation of self.scores_
@@ -36,6 +43,7 @@ class DFE(RFE):
         # self.scores_ will not be calculated when calling _fit through fit
 
         X, y = check_X_y(X, y, "csc")
+        X = pd.DataFrame(X)
 
         n_samples, n_features = X.shape
         if self.n_features_to_select is None:
@@ -55,7 +63,7 @@ class DFE(RFE):
         if self.verbose > 0:
             print("Computing MI with %d features." % n_features)
 
-        skb = SelectKBest(score_func=mutual_info_classif, k=1)
+        skb = SelectKBest(score_func=mutual_info_regression, k=1)
         skb.fit(X, y)
         coefs = skb.scores_
 
@@ -63,70 +71,62 @@ class DFE(RFE):
         ranks = np.argsort(safe_sqr(coefs))
 
         worst_feature = 0
-        if n_samples < np.sum(support_):
-            # Number of collinear features
-            n_collinear = np.sum(support_) - n_samples
-
-            # Eliminate features up to the threshold
-            threshold = np.min([n_features_to_select, n_collinear])
-
-            # Find worst feature
-            worst_feature = threshold + 1
-
-            # Compute step score on the previous selection iteration
-            # because 'estimator' must use features
-            # that have not been eliminated yet
-            support_[features[ranks][:threshold + 1]] = False
-            ranking_[np.logical_not(support_)] += 1
-
-        X_worse = X[:, worst_feature]
+        # if n_samples < np.sum(support_):
+        #     # Number of collinear features
+        #     n_collinear = np.sum(support_) - n_samples
+        #
+        #     # Eliminate features up to the threshold
+        #     threshold = np.min([n_features_to_select, n_collinear])
+        #
+        #     # Find worst feature
+        #     worst_feature = threshold + 1
+        #
+        #     # Compute step score on the previous selection iteration
+        #     # because 'estimator' must use features
+        #     # that have not been eliminated yet
+        #     support_[features[ranks][:threshold + 1]] = False
+        #     ranking_[np.logical_not(support_)] += 1
 
         # Recursive elimination
-        i = 0
+        i = 1
         while np.sum(support_) > n_features_to_select:
 
-            if worst_feature == n_features - 1:
+            if worst_feature == n_features:
                 break
 
-            # Remaining features
-            features = np.arange(n_features)[support_]
+            support_[ranks[worst_feature]] = False
+            X_worse = X.iloc[:, ranks[worst_feature]]
+
+            skf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
+            train_index, val_index = [split for split in skf.split(X_worse)][0]
+            X_train, X_val = X.iloc[train_index, support_], X.iloc[val_index, support_]
+            y_train, y_val = X_worse[train_index], X_worse[val_index]
 
             # Eliminate predictable features
             if self.verbose > 0:
-                print("Iteration %d: worst: %d" % (i, worst_feature))
+                print("Fitting estimator with %d features (%d/%d)" % (np.sum(support_), i, n_features))
                 i += 1
-                print("Selected features: %d." % np.sum(support_))
 
-            # Classification problem
-            try:
-                skb = SelectKBest(score_func=mutual_info_classif, k=1)
-                skb.fit(X[:, features], X_worse)
-                score = skb.scores_
-            except ValueError:
-                skb = SelectKBest(score_func=mutual_info_regression, k=1)
-                skb.fit(X[:, features], X_worse)
-                score = skb.scores_
-
-            # score /= np.max(score)
-            score = np.max(score)
-
-            worst_feature += 1
+            estimator = clone(self.estimator)
+            estimator.fit(X_train, y_train)
+            score = estimator.score(X_val, y_val)
 
             if score >= self.base_score:
 
                 # Compute step score on the previous selection iteration
                 # because 'estimator' must use features
                 # that have not been eliminated yet
-                support_[ranks[worst_feature]] = False
                 ranking_[np.logical_not(support_)] += 1
 
-            # Find the worst feature
-            X_worse = X[:, ranks[worst_feature]]
+            else:
+                support_[ranks[worst_feature]] = True
+
+            worst_feature += 1
 
         # Set final attributes
         features = np.arange(n_features)[support_]
         self.estimator_ = clone(self.estimator)
-        self.estimator_.fit(X[:, features], y)
+        self.estimator_.fit(X.iloc[:, features], y)
 
         # Compute step score when only n_features_to_select features left
         if step_score:
