@@ -57,35 +57,22 @@ class DFE(RFE):
         if step_score:
             self.scores_ = []
 
-        # Remaining features
-        features = np.arange(n_features)[support_]
+        estimator = clone(self.estimator)
+        estimator.fit(X, y)
 
-        if self.verbose > 0:
-            print("Computing MI with %d features." % n_features)
-
-        skb = SelectKBest(score_func=mutual_info_regression, k=1)
-        skb.fit(X, y)
-        coefs = skb.scores_
+        # Get coefs
+        if hasattr(estimator, 'coef_'):
+            coefs = estimator.coef_
+        else:
+            coefs = getattr(estimator, 'feature_importances_', None)
+        if coefs is None:
+            raise RuntimeError('The classifier does not expose '
+                               '"coef_" or "feature_importances_" '
+                               'attributes')
 
         # Get ranks
         ranks = np.argsort(safe_sqr(coefs))
-
         worst_feature = 0
-        # if n_samples < np.sum(support_):
-        #     # Number of collinear features
-        #     n_collinear = np.sum(support_) - n_samples
-        #
-        #     # Eliminate features up to the threshold
-        #     threshold = np.min([n_features_to_select, n_collinear])
-        #
-        #     # Find worst feature
-        #     worst_feature = threshold + 1
-        #
-        #     # Compute step score on the previous selection iteration
-        #     # because 'estimator' must use features
-        #     # that have not been eliminated yet
-        #     support_[features[ranks][:threshold + 1]] = False
-        #     ranking_[np.logical_not(support_)] += 1
 
         # Recursive elimination
         i = 1
