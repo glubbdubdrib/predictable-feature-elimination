@@ -1,3 +1,5 @@
+import sys
+
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import RidgeClassifier, LogisticRegression, LinearRegression, Ridge
@@ -5,6 +7,7 @@ from sklearn import clone
 from lazygrid.datasets import load_openml_dataset
 from sklearn.model_selection import cross_validate
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR, LinearSVC, LinearSVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
@@ -14,105 +17,85 @@ import pandas as pd
 import scipy
 import os
 
-seed = 42
-cv = 10
-results_dir = "./test3"
-global_scores = pd.DataFrame()
-
 datasets = [
-    # "ionosphere",   # 351 instances     35 features     2 classes
-    # "madelon",      # 2600 instances    500 features    2 classes
-    "isolet",       # 1560 instances    617 features    26 classes
-
-    # "gisette",      # 7000 instances    5000 features   2 classes
-    # "leukemia",     # 72 instances      7130 features   2 classes
-    # "arcene",       # 200 instances     10000 features  2 classes
+    "iris",
+    "yeast_ml8",            # 2417 samples      116 features        2 classes
+    "scene",                # 2407 samples      299 features        2 classes
+    "madelon",              # 2600 samples      500 features        2 classes
+    "isolet",               # 7797 samples      617 features        26 classes
+    "gina_agnostic",        # 3468 samples      970 features        2 classes
+    "arcene",               # 200 samples       10000 features      2 classes
+    "gisette",              # 7000 samples      5000 features       2 classes
 ]
 
-for dataset in datasets:
 
-    X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+def main():
 
-    clf = RidgeClassifier(random_state=seed)
-    logc = RidgeClassifier(random_state=seed)
-    logr = Ridge(random_state=seed)
-    # regr = RandomForestRegressor(random_state=seed)
+    # Cross-validation params
+    cv = 10
+    n_jobs = -1
+    seed = 42
+    results_dir = "./results"
 
-    pipeline_dfe = Pipeline([("dfe", DFE(clone(clf), base_score=1, verbose=1)), ("clf", clone(clf))])
-    pipeline_pfe = Pipeline([("pfe", PFE(clone(clf), clone(logr), clone(logc), verbose=1)), ("clf", clone(clf))])
-    pipeline_rfe = Pipeline([("rfe", RFE(clone(clf), verbose=1)), ("clf", clone(clf))])
+    overall_scores = pd.DataFrame()
 
-    # cross validation
-    scores_dfe = cross_validate(pipeline_dfe, X, y, n_jobs=-1, cv=cv, return_train_score=True, return_estimator=True)
-    # scores_pfe = cross_validate(pipeline_pfe, X, y, n_jobs=1, cv=cv, return_train_score=True, return_estimator=True)
-    scores_rfe = cross_validate(pipeline_rfe, X, y, n_jobs=-1, cv=cv, return_train_score=True, return_estimator=True)
+    for dataset in datasets:
 
-    n_features_dfe = [sum(estimator.steps[0][1].support_) for estimator in scores_dfe["estimator"]]
-    scores_dfe["n_features_selected"] = n_features_dfe
-    # n_features_pfe = [sum(estimator.steps[0][1].support_) for estimator in scores_pfe["estimator"]]
-    # scores_pfe["n_features_selected"] = n_features_pfe
-    n_features_rfe = [sum(estimator.steps[0][1].support_) for estimator in scores_rfe["estimator"]]
-    scores_rfe["n_features_selected"] = n_features_rfe
+        verbose_scores = pd.DataFrame()
+        summary_scores = pd.DataFrame()
 
-    scores = pd.DataFrame()
-    scores = pd.concat([scores, pd.DataFrame.from_records(scores_dfe)], ignore_index=True)
-    # scores = pd.concat([scores, pd.DataFrame.from_records(scores_pfe)], ignore_index=True)
-    scores = pd.concat([scores, pd.DataFrame.from_records(scores_rfe)], ignore_index=True)
+        if not os.path.isdir(results_dir):
+            os.makedirs(results_dir)
 
-    if not os.path.isdir(results_dir):
-        os.makedirs(results_dir)
-    scores.to_csv(os.path.join(results_dir, dataset + ".csv"))
+        X, y, n_classes = load_openml_dataset(dataset_name=dataset)
 
-    global_scores_dfe = {
-        "dataset": dataset,
-        "n_samples": X.shape[0],
-        "n_features": X.shape[1],
-        "n_classes": n_classes,
-        "method": "DFE",
-        "avg_fit_time": scipy.average(scores_dfe["fit_time"]),
-        "sem_fit_time": scipy.stats.sem(scores_dfe["fit_time"]),
-        "avg_train_score": scipy.average(scores_dfe["train_score"]),
-        "sem_train_score": scipy.stats.sem(scores_dfe["train_score"]),
-        "avg_test_score": scipy.average(scores_dfe["test_score"]),
-        "sem_test_score": scipy.stats.sem(scores_dfe["test_score"]),
-        "avg_n_features": scipy.average(n_features_dfe),
-        "sem_n_features": scipy.stats.sem(n_features_dfe)
-    }
+        clf = RidgeClassifier(random_state=seed)
+        regr = Ridge(random_state=seed)
+        est = RidgeClassifier(random_state=seed)
 
-    # global_scores_pfe = {
-    #     "dataset": dataset,
-    #     "n_samples": X.shape[0],
-    #     "n_features": X.shape[1],
-    #     "n_classes": n_classes,
-    #     "method": "PFE",
-    #     "avg_fit_time": scipy.average(scores_pfe["fit_time"]),
-    #     "sem_fit_time": scipy.stats.sem(scores_pfe["fit_time"]),
-    #     "avg_train_score": scipy.average(scores_pfe["train_score"]),
-    #     "sem_train_score": scipy.stats.sem(scores_pfe["train_score"]),
-    #     "avg_test_score": scipy.average(scores_pfe["test_score"]),
-    #     "sem_test_score": scipy.stats.sem(scores_pfe["test_score"]),
-    #     "avg_n_features": scipy.average(n_features_pfe),
-    #     "sem_n_features": scipy.stats.sem(n_features_pfe)
-    # }
+        sc = StandardScaler()
+        pipelines = [
+            Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
+            # Pipeline([("pfe", PFE(clone(clf), clone(logr), clone(logc), verbose=1)), ("clf", clone(clf))]),
+        ]
 
-    global_scores_rfe = {
-        "dataset": dataset,
-        "n_samples": X.shape[0],
-        "n_features": X.shape[1],
-        "n_classes": n_classes,
-        "method": "RFE",
-        "avg_fit_time": scipy.average(scores_rfe["fit_time"]),
-        "sem_fit_time": scipy.stats.sem(scores_rfe["fit_time"]),
-        "avg_train_score": scipy.average(scores_rfe["train_score"]),
-        "sem_train_score": scipy.stats.sem(scores_rfe["train_score"]),
-        "avg_test_score": scipy.average(scores_rfe["test_score"]),
-        "sem_test_score": scipy.stats.sem(scores_rfe["test_score"]),
-        "avg_n_features": scipy.average(n_features_rfe),
-        "sem_n_features": scipy.stats.sem(n_features_rfe)
-    }
+        for pipeline in pipelines:
 
-    global_scores = pd.concat([global_scores, pd.DataFrame.from_records(global_scores_dfe, index=["dataset"])], ignore_index=True)
-    # global_scores = pd.concat([global_scores, pd.DataFrame.from_records(global_scores_pfe, index=["dataset"])], ignore_index=True)
-    global_scores = pd.concat([global_scores, pd.DataFrame.from_records(global_scores_rfe, index=["dataset"])], ignore_index=True)
+            # cross validation
+            scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,
+                                    return_train_score=True, return_estimator=True)
 
-    global_scores.to_csv(os.path.join(results_dir, "summary.csv"))
+            n_features = [sum(estimator.steps[1][1].support_) for estimator in scores["estimator"]]
+            scores["n_features_selected"] = n_features
+
+            scores = pd.DataFrame.from_records(scores)
+            verbose_scores = pd.concat([verbose_scores, scores], ignore_index=True)
+            verbose_scores.to_csv(os.path.join(results_dir, dataset + "_verbose.csv"))
+
+            summary = {
+                "dataset": dataset,
+                "samples": X.shape[0],
+                "features": X.shape[1],
+                "classes": n_classes,
+                "method": pipeline.steps[1][1].__class__.__name__,
+                "avg fit time": scipy.average(scores["fit_time"]),
+                "sem fit time": scipy.stats.sem(scores["fit_time"]),
+                "avg train score": scipy.average(scores["train_score"]),
+                "sem train score": scipy.stats.sem(scores["train_score"]),
+                "avg test score": scipy.average(scores["test_score"]),
+                "sem test score": scipy.stats.sem(scores["test_score"]),
+                "avg n features": scipy.average(n_features),
+                "sem n features": scipy.stats.sem(n_features)
+            }
+
+            summary = pd.DataFrame.from_records(summary, index=["dataset"])
+            summary_scores = pd.concat([summary_scores, summary], ignore_index=True)
+            summary_scores.to_csv(os.path.join(results_dir, dataset + "_summary.csv"))
+
+            overall_scores = pd.concat([overall_scores, summary], ignore_index=True)
+            overall_scores.to_csv(os.path.join(results_dir, "overall_results.csv"))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
