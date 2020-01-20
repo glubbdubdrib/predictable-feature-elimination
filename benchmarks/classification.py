@@ -18,14 +18,20 @@ import scipy
 import os
 
 datasets = [
-    "iris",
-    "yeast_ml8",            # 2417 samples      116 features        2 classes
-    "scene",                # 2407 samples      299 features        2 classes
-    "madelon",              # 2600 samples      500 features        2 classes
-    "isolet",               # 7797 samples      617 features        26 classes
-    "gina_agnostic",        # 3468 samples      970 features        2 classes
-    "arcene",               # 200 samples       10000 features      2 classes
-    "gisette",              # 7000 samples      5000 features       2 classes
+    # "iris",
+    # "yeast_ml8",                            # 2417 samples      116 features        2 classes
+    # "scene",                                # 2407 samples      299 features        2 classes
+    # "madelon",                              # 2600 samples      500 features        2 classes
+    # "isolet",                               # 7797 samples      617 features        26 classes
+    # "gina_agnostic",                        # 3468 samples      970 features        2 classes
+    "gisette",                              # 7000 samples      5000 features       2 classes
+    "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
+    "OVA_Colon",                            # 1545 samples      10936 features      2 classes
+    "GCM",                                  # 190 samples       16063 features      14 classes
+    "Dexter",                               # 600 samples       20000 features      2 classes
+    "variousCancers_final",                 # 383 samples       54676 features      9 classes
+    "anthracyclineTaxaneChemotherapy",      # 159 samples       61360 features      2 classes
+    "Dorothea",                             # 1150 samples      100000 features     2 classes
 ]
 
 
