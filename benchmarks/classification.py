@@ -18,12 +18,12 @@ import scipy
 import os
 
 datasets = [
-    # "iris",
-    # "yeast_ml8",                            # 2417 samples      116 features        2 classes
-    # "scene",                                # 2407 samples      299 features        2 classes
-    # "madelon",                              # 2600 samples      500 features        2 classes
-    # "isolet",                               # 7797 samples      617 features        26 classes
-    # "gina_agnostic",                        # 3468 samples      970 features        2 classes
+    "iris",
+    "yeast_ml8",                            # 2417 samples      116 features        2 classes
+    "scene",                                # 2407 samples      299 features        2 classes
+    "madelon",                              # 2600 samples      500 features        2 classes
+    "isolet",                               # 7797 samples      617 features        26 classes
+    "gina_agnostic",                        # 3468 samples      970 features        2 classes
     "gisette",                              # 7000 samples      5000 features       2 classes
     "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
     "OVA_Colon",                            # 1545 samples      10936 features      2 classes
@@ -39,7 +39,7 @@ def main():
 
     # Cross-validation params
     cv = 10
-    n_jobs = -1
+    n_jobs = 5
     seed = 42
     results_dir = "./results"
 
@@ -61,7 +61,11 @@ def main():
 
         sc = StandardScaler()
         pipelines = [
-            Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            # Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            Pipeline([("sc", sc),
+                      ("fs1", DFE(clone(regr), base_score=0.9, verbose=1)),
+                      ("fs2", RFE(clone(clf), verbose=1)),
+                      ("est", clone(est))]),
             Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
             # Pipeline([("pfe", PFE(clone(clf), clone(logr), clone(logc), verbose=1)), ("clf", clone(clf))]),
         ]
@@ -72,7 +76,7 @@ def main():
             scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,
                                     return_train_score=True, return_estimator=True)
 
-            n_features = [sum(estimator.steps[1][1].support_) for estimator in scores["estimator"]]
+            n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
             scores["n_features_selected"] = n_features
 
             scores = pd.DataFrame.from_records(scores)
