@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR, LinearSVC, LinearSVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
+from deeppfe.dpfe import DPFE
 from dfe import DFE
 from pfe.pfe import PFE
 import pandas as pd
@@ -22,16 +23,16 @@ datasets = [
     "yeast_ml8",                            # 2417 samples      116 features        2 classes
     "scene",                                # 2407 samples      299 features        2 classes
     "madelon",                              # 2600 samples      500 features        2 classes
-    "isolet",                               # 7797 samples      617 features        26 classes
-    "gina_agnostic",                        # 3468 samples      970 features        2 classes
-    "gisette",                              # 7000 samples      5000 features       2 classes
-    "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
-    "OVA_Colon",                            # 1545 samples      10936 features      2 classes
-    "GCM",                                  # 190 samples       16063 features      14 classes
-    "Dexter",                               # 600 samples       20000 features      2 classes
-    "variousCancers_final",                 # 383 samples       54676 features      9 classes
-    "anthracyclineTaxaneChemotherapy",      # 159 samples       61360 features      2 classes
-    "Dorothea",                             # 1150 samples      100000 features     2 classes
+    # "isolet",                               # 7797 samples      617 features        26 classes
+    # "gina_agnostic",                        # 3468 samples      970 features        2 classes
+    # "gisette",                              # 7000 samples      5000 features       2 classes
+    # "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
+    # "OVA_Colon",                            # 1545 samples      10936 features      2 classes
+    # "GCM",                                  # 190 samples       16063 features      14 classes
+    # "Dexter",                               # 600 samples       20000 features      2 classes
+    # "variousCancers_final",                 # 383 samples       54676 features      9 classes
+    # "anthracyclineTaxaneChemotherapy",      # 159 samples       61360 features      2 classes
+    # "Dorothea",                             # 1150 samples      100000 features     2 classes
 ]
 
 
@@ -39,7 +40,7 @@ def main():
 
     # Cross-validation params
     cv = 10
-    n_jobs = 5
+    n_jobs = 4
     seed = 42
     results_dir = "./results"
 
@@ -57,17 +58,18 @@ def main():
 
         clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
-        est = RidgeClassifier(random_state=seed)
+        est = RandomForestClassifier(random_state=seed)
 
         sc = StandardScaler()
         pipelines = [
-            # Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
-            Pipeline([("sc", sc),
-                      ("fs1", DFE(clone(regr), base_score=0.9, verbose=1)),
-                      ("fs2", RFE(clone(clf), verbose=1)),
-                      ("est", clone(est))]),
+            # Pipeline([("sc", sc), ("fs", DPFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            Pipeline([("sc", sc), ("fs", PFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
+            # Pipeline([("sc", sc),
+            #           ("fs1", DFE(clone(regr), base_score=0.9, verbose=1)),
+            #           ("fs2", RFE(clone(clf), verbose=1)),
+            #           ("est", clone(est))]),
             Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
-            # Pipeline([("pfe", PFE(clone(clf), clone(logr), clone(logc), verbose=1)), ("clf", clone(clf))]),
         ]
 
         for pipeline in pipelines:
@@ -76,7 +78,10 @@ def main():
             scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,
                                     return_train_score=True, return_estimator=True)
 
-            n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
+            try:
+                n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
+            except:
+                n_features = [estimator.steps[-1][1].feature_importances_.shape[0] for estimator in scores["estimator"]]
             scores["n_features_selected"] = n_features
 
             scores = pd.DataFrame.from_records(scores)
@@ -99,12 +104,12 @@ def main():
                 "sem n features": scipy.stats.sem(n_features)
             }
 
-            summary = pd.DataFrame.from_records(summary, index=["dataset"])
-            summary_scores = pd.concat([summary_scores, summary], ignore_index=True)
+            summary = pd.Series(summary)
+            summary_scores = pd.concat([summary_scores, summary], axis=1, ignore_index=True)
             summary_scores.to_csv(os.path.join(results_dir, dataset + "_summary.csv"))
 
-            overall_scores = pd.concat([overall_scores, summary], ignore_index=True)
-            overall_scores.to_csv(os.path.join(results_dir, "overall_results.csv"))
+            overall_scores = pd.concat([overall_scores, summary], axis=1, ignore_index=True)
+            overall_scores.T.to_csv(os.path.join(results_dir, "overall_results.csv"))
 
 
 if __name__ == "__main__":
