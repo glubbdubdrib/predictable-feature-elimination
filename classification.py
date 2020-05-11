@@ -19,17 +19,17 @@ from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udf
 
 datasets = [
     "iris",
-    # "yeast_ml8",                    # 2417 samples      116 features    2 classes
-    # "scene",                        # 2407 samples      299 features    2 classes
-    # "isolet",                       # 7797 samples      617 features    26 classes
-    # "gina_agnostic",                # 3468 samples      970 features    2 classes
-    # "gas-drift",                    # 13910 samples     129 features    6 classes
-    # "mozilla4",                     # 15545 samples     6 features      2 classes
-    # "letter",                       # 20000 samples     17 samples      26 classes
-    # "Amazon_employee_access",       # 32769 samples     10 features     2 classes
-    # "electricity",                  # 45312 samples     9 features      2 classes
-    # "mnist_784",                    # 70000 samples     785 features    10 classes
-    # "covertype",                    # 581012 samples    55 features     7 classes
+    "yeast_ml8",                    # 2417 samples      116 features    2 classes
+    "scene",                        # 2407 samples      299 features    2 classes
+    "isolet",                       # 7797 samples      617 features    26 classes
+    "gina_agnostic",                # 3468 samples      970 features    2 classes
+    "gas-drift",                    # 13910 samples     129 features    6 classes
+    "mozilla4",                     # 15545 samples     6 features      2 classes
+    "letter",                       # 20000 samples     17 samples      26 classes
+    "Amazon_employee_access",       # 32769 samples     10 features     2 classes
+    "electricity",                  # 45312 samples     9 features      2 classes
+    "mnist_784",                    # 70000 samples     785 features    10 classes
+    "covertype",                    # 581012 samples    55 features     7 classes
 
     # "gisette",                              # 7000 samples      5000 features       2 classes
     # "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
