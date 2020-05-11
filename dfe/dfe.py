@@ -78,11 +78,11 @@ class DFE(RFE):
             X_worse = X.iloc[:, ranks[worst_feature]]
 
             correlation_to_worst_feature = -C[:, ranks[worst_feature]]
-            correlation_to_worst_feature[support_==False] = 0
+            correlation_to_worst_feature[support_ == False] = 0
             most_related_features = np.argsort(correlation_to_worst_feature)
             sorted_support = support_[most_related_features]
             if self.min_corr < np.max(-correlation_to_worst_feature):
-                sorted_support = sorted_support & (-correlation_to_worst_feature[most_related_features]>self.min_corr)
+                sorted_support = sorted_support & (-correlation_to_worst_feature[most_related_features] > self.min_corr)
 
             X_reduced = X.iloc[:, most_related_features[sorted_support]]
 

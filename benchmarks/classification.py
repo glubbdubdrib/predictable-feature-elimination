@@ -1,30 +1,36 @@
 import sys
+import scipy
+import os
 
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.feature_selection import RFE
-from sklearn.linear_model import RidgeClassifier, LogisticRegression, LinearRegression, Ridge
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import RFE, SelectKBest
+from sklearn.linear_model import RidgeClassifier, Ridge
 from sklearn import clone
 from lazygrid.datasets import load_openml_dataset
 from sklearn.model_selection import cross_validate
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC, SVR, LinearSVC, LinearSVR
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-
-from deeppfe.dpfe import DPFE
-from dfe import DFE
-from pfe.pfe import PFE
+from tqdm import tqdm
 import pandas as pd
-import scipy
-import os
+import numpy as np
+
+from dfe import DFE
+from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udfs
 
 datasets = [
     "iris",
-    "yeast_ml8",                            # 2417 samples      116 features        2 classes
-    "scene",                                # 2407 samples      299 features        2 classes
-    "madelon",                              # 2600 samples      500 features        2 classes
-    # "isolet",                               # 7797 samples      617 features        26 classes
-    # "gina_agnostic",                        # 3468 samples      970 features        2 classes
+    "yeast_ml8",                    # 2417 samples      116 features    2 classes
+    "scene",                        # 2407 samples      299 features    2 classes
+    "isolet",                       # 7797 samples      617 features    26 classes
+    "gina_agnostic",                # 3468 samples      970 features    2 classes
+    "gas-drift",                    # 13910 samples     129 features    6 classes
+    "mozilla4",                     # 15545 samples     6 features      2 classes
+    "letter",                       # 20000 samples     17 samples      26 classes
+    "Amazon_employee_access",       # 32769 samples     10 features     2 classes
+    "electricity",                  # 45312 samples     9 features      2 classes
+    "mnist_784",                    # 70000 samples     785 features    10 classes
+    "covertype",                    # 581012 samples    55 features     7 classes
+
     # "gisette",                              # 7000 samples      5000 features       2 classes
     # "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
     # "OVA_Colon",                            # 1545 samples      10936 features      2 classes
@@ -37,7 +43,6 @@ datasets = [
 
 
 def main():
-
     # Cross-validation params
     cv = 10
     n_jobs = 4
@@ -46,7 +51,10 @@ def main():
 
     overall_scores = pd.DataFrame()
 
-    for dataset in datasets:
+    bar_position = 0
+    progress_bar = tqdm(datasets, position=bar_position)
+    for dataset in progress_bar:
+        progress_bar.set_description("Analysis of dataset: %s" % dataset)
 
         verbose_scores = pd.DataFrame()
         summary_scores = pd.DataFrame()
@@ -60,24 +68,43 @@ def main():
         regr = Ridge(random_state=seed)
         est = RandomForestClassifier(random_state=seed)
 
-        sc = StandardScaler()
-        pipelines = [
-            # Pipeline([("sc", sc), ("fs", DPFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
-            Pipeline([("sc", sc), ("fs", PFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
-            Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9, verbose=1)), ("est", clone(est))]),
-            # Pipeline([("sc", sc),
-            #           ("fs1", DFE(clone(regr), base_score=0.9, verbose=1)),
-            #           ("fs2", RFE(clone(clf), verbose=1)),
-            #           ("est", clone(est))]),
-            Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
-        ]
+        fs_lap_score = SelectKBest(SKF_lap)
+        fs_SPEC = SelectKBest(SKF_spec)
+        fs_MCFS = SelectKBest(SKF_mcfs)
+        fs_NDFS = SelectKBest(SKF_ndfs)
+        fs_UDFS = SelectKBest(SKF_udfs)
 
-        for pipeline in pipelines:
+        sc = StandardScaler()
+        pipelines = {
+            "DFE": Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9)), ("est", clone(est))]),
+            "lap_score": Pipeline([("sc", sc), ("fs", fs_lap_score), ("est", clone(est))]),
+            "SPEC": Pipeline([("sc", sc), ("fs", fs_SPEC), ("est", clone(est))]),
+            "NDFS": Pipeline([("sc", sc), ("fs", fs_NDFS), ("est", clone(est))]),
+            "UDFS": Pipeline([("sc", sc), ("fs", fs_UDFS), ("est", clone(est))]),
+            "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
+            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
+            "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
+        }
+
+        k_best_list = ["lap_score",
+                       "SPEC",
+                       "NDFS",
+                       "UDFS",
+                       "MCFS",]
+
+        for method, pipeline in pipelines.items():
+
+            # for feature selection methods that need to specify the number
+            # of features to select a priori, just pick the number of features
+            # chosen by DFE
+            if method in k_best_list:
+                setattr(pipeline.steps[1][1], "k", int(round(k_select)))
 
             # cross validation
             scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,
                                     return_train_score=True, return_estimator=True)
 
+            # save results
             try:
                 n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
             except:
@@ -93,14 +120,14 @@ def main():
                 "samples": X.shape[0],
                 "features": X.shape[1],
                 "classes": n_classes,
-                "method": pipeline.steps[1][1].__class__.__name__,
-                "avg fit time": scipy.average(scores["fit_time"]),
+                "method": method,
+                "avg fit time": np.average(scores["fit_time"]),
                 "sem fit time": scipy.stats.sem(scores["fit_time"]),
-                "avg train score": scipy.average(scores["train_score"]),
+                "avg train score": np.average(scores["train_score"]),
                 "sem train score": scipy.stats.sem(scores["train_score"]),
-                "avg test score": scipy.average(scores["test_score"]),
+                "avg test score": np.average(scores["test_score"]),
                 "sem test score": scipy.stats.sem(scores["test_score"]),
-                "avg n features": scipy.average(n_features),
+                "avg n features": np.average(n_features),
                 "sem n features": scipy.stats.sem(n_features)
             }
 
@@ -110,6 +137,9 @@ def main():
 
             overall_scores = pd.concat([overall_scores, summary], axis=1, ignore_index=True)
             overall_scores.T.to_csv(os.path.join(results_dir, "overall_results.csv"))
+
+            if method == "DFE":
+                k_select = np.average(n_features)
 
 
 if __name__ == "__main__":
