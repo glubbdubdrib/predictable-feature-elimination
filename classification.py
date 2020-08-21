@@ -2,7 +2,7 @@ import sys
 import scipy
 import os
 
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import RFE, SelectKBest
 from sklearn.linear_model import RidgeClassifier, Ridge
 from sklearn import clone
@@ -18,18 +18,20 @@ from dfe.dfe import DFE
 from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udfs
 
 datasets = [
-    "iris",
+    # "iris",
+
     "yeast_ml8",                    # 2417 samples      116 features    2 classes
     "scene",                        # 2407 samples      299 features    2 classes
     "isolet",                       # 7797 samples      617 features    26 classes
     "gina_agnostic",                # 3468 samples      970 features    2 classes
     "gas-drift",                    # 13910 samples     129 features    6 classes
-    "mozilla4",                     # 15545 samples     6 features      2 classes
     "letter",                       # 20000 samples     17 samples      26 classes
-    "Amazon_employee_access",       # 32769 samples     10 features     2 classes
-    "electricity",                  # 45312 samples     9 features      2 classes
-    "mnist_784",                    # 70000 samples     785 features    10 classes
-    "covertype",                    # 581012 samples    55 features     7 classes
+
+    # "mozilla4",                     # 15545 samples     6 features      2 classes
+    # "Amazon_employee_access",       # 32769 samples     10 features     2 classes
+    # "electricity",                  # 45312 samples     9 features      2 classes
+    # "mnist_784",                    # 70000 samples     785 features    10 classes
+    # "covertype",                    # 581012 samples    55 features     7 classes
 
     # "gisette",                              # 7000 samples      5000 features       2 classes
     # "amazon-commerce-reviews",              # 1500 samples      10000 features      50 classes
@@ -45,9 +47,11 @@ datasets = [
 def main():
     # Cross-validation params
     cv = 10
-    n_jobs = 4
+    n_jobs = -1
     seed = 42
-    results_dir = "./results"
+    results_dir = "./results/classification"
+    if not os.path.isdir(results_dir):
+        os.makedirs(results_dir)
 
     overall_scores = pd.DataFrame()
 
@@ -64,9 +68,9 @@ def main():
 
         X, y, n_classes = load_openml_dataset(dataset_name=dataset)
 
-        clf = RidgeClassifier(random_state=seed)
+        # clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
-        est = RandomForestClassifier(random_state=seed)
+        est = RandomForestRegressor(random_state=seed)
 
         fs_lap_score = SelectKBest(SKF_lap)
         fs_SPEC = SelectKBest(SKF_spec)
@@ -82,7 +86,7 @@ def main():
             "NDFS": Pipeline([("sc", sc), ("fs", fs_NDFS), ("est", clone(est))]),
             "UDFS": Pipeline([("sc", sc), ("fs", fs_UDFS), ("est", clone(est))]),
             "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
-            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(clf), verbose=1)), ("est", clone(est))]),
+            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(regr), verbose=1)), ("est", clone(est))]),
             "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
         }
 
@@ -109,7 +113,18 @@ def main():
                 n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
             except:
                 n_features = [estimator.steps[-1][1].feature_importances_.shape[0] for estimator in scores["estimator"]]
+
+            if method != 'NO-FS':
+                try:
+                    features = [estimator.steps[1][1].scores_ for estimator in scores["estimator"]]
+                except:
+                    features = [estimator.steps[1][1].ranking_ for estimator in scores["estimator"]]
+            else:
+                features = [np.ones(n_features[0]).astype(int) for _ in range(len(n_features))]
+
             scores["n_features_selected"] = n_features
+            scores["features_selected"] = features
+            scores["estimator"] = method
 
             scores = pd.DataFrame.from_records(scores)
             verbose_scores = pd.concat([verbose_scores, scores], ignore_index=True)
