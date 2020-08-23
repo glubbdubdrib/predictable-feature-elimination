@@ -43,7 +43,7 @@ class DFE(RFE):
         # and is used when implementing RFECV
         # self.scores_ will not be calculated when calling _fit through fit
 
-        X, y = check_X_y(X, y, "csc")
+        # X, y = check_X_y(X, y, "csc")
         X = pd.DataFrame(X)
 
         n_samples, n_features = X.shape
@@ -86,10 +86,14 @@ class DFE(RFE):
 
             X_reduced = X.iloc[:, most_related_features[sorted_support]]
 
-            skf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
-            train_index, val_index = [split for split in skf.split(X_worse)][0]
-            X_train, X_val = X_reduced.iloc[train_index], X_reduced.iloc[val_index]
-            y_train, y_val = X_worse[train_index], X_worse[val_index]
+            if self.n_splits > n_samples:
+                skf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
+                train_index, val_index = [split for split in skf.split(X_worse)][0]
+                X_train, X_val = X_reduced.iloc[train_index], X_reduced.iloc[val_index]
+                y_train, y_val = X_worse[train_index], X_worse[val_index]
+            else:
+                X_train, X_val = X_reduced, X_reduced
+                y_train, y_val = X_worse, X_worse
 
             # Eliminate predictable features
             if self.verbose > 0:
