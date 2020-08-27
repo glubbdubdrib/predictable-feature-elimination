@@ -2,6 +2,7 @@ import sys
 import scipy
 import os
 
+from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import RFE, SelectKBest
 from sklearn.linear_model import RidgeClassifier, Ridge
@@ -17,15 +18,30 @@ import numpy as np
 from dfe.dfe import DFE
 from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udfs
 
+random_state = 42
+X1, y1 = make_classification(n_samples=2600, n_features=500,
+                             n_informative=100, n_repeated=0,
+                             class_sep=5, random_state=random_state)
+X2, y2 = make_classification(n_samples=2600, n_features=500,
+                             n_informative=300, n_repeated=0,
+                             class_sep=5, random_state=random_state)
+X3, y3 = make_classification(n_samples=2600, n_features=500,
+                             n_informative=500, n_repeated=0,
+                             class_sep=5, random_state=random_state)
+
 datasets = [
     # "iris",
 
-    "yeast_ml8",                    # 2417 samples      116 features    2 classes
-    "scene",                        # 2407 samples      299 features    2 classes
-    "isolet",                       # 7797 samples      617 features    26 classes
-    "gina_agnostic",                # 3468 samples      970 features    2 classes
-    "gas-drift",                    # 13910 samples     129 features    6 classes
-    "letter",                       # 20000 samples     17 samples      26 classes
+    ["madelon-100", X1, y2],
+    ["madelon-300", X1, y2],
+    ["madelon-500", X1, y2],
+
+    # "yeast_ml8",                    # 2417 samples      116 features    2 classes
+    # "scene",                        # 2407 samples      299 features    2 classes
+    # "isolet",                       # 7797 samples      617 features    26 classes
+    # "gina_agnostic",                # 3468 samples      970 features    2 classes
+    # "gas-drift",                    # 13910 samples     129 features    6 classes
+    # "letter",                       # 20000 samples     17 samples      26 classes
 
     # "mozilla4",                     # 15545 samples     6 features      2 classes
     # "Amazon_employee_access",       # 32769 samples     10 features     2 classes
@@ -49,7 +65,7 @@ def main():
     cv = 10
     n_jobs = -1
     seed = 42
-    results_dir = "./results/classification"
+    results_dir = "./results/classification2"
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
 
@@ -58,6 +74,7 @@ def main():
     bar_position = 0
     progress_bar = tqdm(datasets, position=bar_position)
     for dataset in progress_bar:
+        dataset, X, y = dataset
         progress_bar.set_description("Analysis of dataset: %s" % dataset)
 
         verbose_scores = pd.DataFrame()
@@ -66,7 +83,8 @@ def main():
         if not os.path.isdir(results_dir):
             os.makedirs(results_dir)
 
-        X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+        # X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+        n_classes = len(set(y))
 
         # clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
@@ -94,7 +112,7 @@ def main():
                        "SPEC",
                        "NDFS",
                        "UDFS",
-                       "MCFS",]
+                       "MCFS", ]
 
         for method, pipeline in pipelines.items():
 
