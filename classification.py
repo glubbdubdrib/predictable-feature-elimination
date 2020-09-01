@@ -21,20 +21,24 @@ from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udf
 random_state = 42
 X1, y1 = make_classification(n_samples=2600, n_features=500,
                              n_informative=100, n_redundant=0, n_repeated=50,
-                             class_sep=5, random_state=random_state)
+                             class_sep=5, random_state=random_state, shuffle=False)
 X2, y2 = make_classification(n_samples=2600, n_features=500,
                              n_informative=200, n_redundant=0, n_repeated=100,
-                             class_sep=5, random_state=random_state)
+                             class_sep=5, random_state=random_state, shuffle=False)
 X3, y3 = make_classification(n_samples=2600, n_features=500,
                              n_informative=300, n_redundant=0, n_repeated=150,
-                             class_sep=5, random_state=random_state)
+                             class_sep=5, random_state=random_state, shuffle=False)
+# X4, y4 = make_classification(n_samples=2600, n_features=5000,
+#                              n_informative=300, n_redundant=0, n_repeated=150,
+#                              class_sep=5, random_state=random_state)
 
 datasets = [
     # "iris",
 
-    ["madelon-100", X1, y2],
-    ["madelon-300", X1, y2],
-    ["madelon-500", X1, y2],
+    ["madelon-100", X1, y1],
+    ["madelon-300", X2, y2],
+    ["madelon-500", X3, y3],
+    # ["madelon-5000", X1, y4],
 
     # "yeast_ml8",                    # 2417 samples      116 features    2 classes
     # "scene",                        # 2407 samples      299 features    2 classes

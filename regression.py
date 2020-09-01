@@ -21,20 +21,20 @@ from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udf
 random_state = 42
 X1, y1 = make_regression(n_samples=2600, n_features=500,
                          n_informative=100, effective_rank=None,
-                         random_state=random_state)
+                         random_state=random_state, shuffle=False)
 X2, y2 = make_regression(n_samples=2600, n_features=500,
                          n_informative=200, effective_rank=50,
-                         random_state=random_state)
+                         random_state=random_state, shuffle=False)
 X3, y3 = make_regression(n_samples=2600, n_features=500,
                          n_informative=300, effective_rank=150,
-                         random_state=random_state)
+                         random_state=random_state, shuffle=False)
 
 datasets = [
     # "iris",
 
-    ["genreg-100", X1, y2],
-    ["genreg-300", X1, y2],
-    ["genreg-500", X1, y2],
+    ["genreg-100", X1, y1],
+    ["genreg-300", X2, y2],
+    ["genreg-500", X3, y3],
 
     # "yeast_ml8",                    # 2417 samples      116 features    2 classes
     # "scene",                        # 2407 samples      299 features    2 classes
