@@ -20,13 +20,13 @@ from skfwrapper.skfwrapper import SKF_lap, SKF_mcfs, SKF_spec, SKF_ndfs, SKF_udf
 
 random_state = 42
 X1, y1 = make_classification(n_samples=2600, n_features=500,
-                             n_informative=100, n_repeated=0,
+                             n_informative=100, n_redundant=0, n_repeated=50,
                              class_sep=5, random_state=random_state)
 X2, y2 = make_classification(n_samples=2600, n_features=500,
-                             n_informative=300, n_repeated=0,
+                             n_informative=200, n_redundant=0, n_repeated=100,
                              class_sep=5, random_state=random_state)
 X3, y3 = make_classification(n_samples=2600, n_features=500,
-                             n_informative=500, n_repeated=0,
+                             n_informative=300, n_redundant=0, n_repeated=150,
                              class_sep=5, random_state=random_state)
 
 datasets = [
@@ -63,7 +63,7 @@ datasets = [
 def main():
     # Cross-validation params
     cv = 10
-    n_jobs = -1
+    n_jobs = 3
     seed = 42
     results_dir = "./results/classification2"
     if not os.path.isdir(results_dir):
@@ -88,7 +88,7 @@ def main():
 
         # clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
-        est = RandomForestRegressor(random_state=seed)
+        est = RidgeClassifier(random_state=seed)
 
         fs_lap_score = SelectKBest(SKF_lap)
         fs_SPEC = SelectKBest(SKF_spec)
@@ -99,12 +99,12 @@ def main():
         sc = StandardScaler()
         pipelines = {
             "DFE": Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9)), ("est", clone(est))]),
+            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(regr), verbose=1)), ("est", clone(est))]),
             "lap_score": Pipeline([("sc", sc), ("fs", fs_lap_score), ("est", clone(est))]),
             "SPEC": Pipeline([("sc", sc), ("fs", fs_SPEC), ("est", clone(est))]),
             "NDFS": Pipeline([("sc", sc), ("fs", fs_NDFS), ("est", clone(est))]),
             "UDFS": Pipeline([("sc", sc), ("fs", fs_UDFS), ("est", clone(est))]),
             "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
-            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(regr), verbose=1)), ("est", clone(est))]),
             "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
         }
 
@@ -121,6 +121,8 @@ def main():
             # chosen by DFE
             if method in k_best_list:
                 setattr(pipeline.steps[1][1], "k", int(round(k_select)))
+            if method == 'RFE':
+                setattr(pipeline.steps[1][1], "n_features_to_select", int(round(k_select)))
 
             # cross validation
             scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,

@@ -23,10 +23,10 @@ X1, y1 = make_regression(n_samples=2600, n_features=500,
                          n_informative=100, effective_rank=None,
                          random_state=random_state)
 X2, y2 = make_regression(n_samples=2600, n_features=500,
-                         n_informative=300, effective_rank=50,
+                         n_informative=200, effective_rank=50,
                          random_state=random_state)
 X3, y3 = make_regression(n_samples=2600, n_features=500,
-                         n_informative=500, effective_rank=150,
+                         n_informative=300, effective_rank=150,
                          random_state=random_state)
 
 datasets = [
@@ -62,8 +62,8 @@ datasets = [
 
 def main():
     # Cross-validation params
-    cv = 2
-    n_jobs = 1
+    cv = 10
+    n_jobs = 5
     seed = 42
     results_dir = "./results/regression"
     if not os.path.isdir(results_dir):
@@ -74,6 +74,7 @@ def main():
     bar_position = 0
     progress_bar = tqdm(datasets, position=bar_position)
     for dataset in progress_bar:
+        dataset, X, y = dataset
         progress_bar.set_description("Analysis of dataset: %s" % dataset)
 
         verbose_scores = pd.DataFrame()
@@ -82,11 +83,12 @@ def main():
         if not os.path.isdir(results_dir):
             os.makedirs(results_dir)
 
-        X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+        # X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+        n_classes = len(set(y))
 
         # clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
-        est = RandomForestRegressor(random_state=seed)
+        est = Ridge(random_state=seed)
 
         fs_lap_score = SelectKBest(SKF_lap)
         fs_SPEC = SelectKBest(SKF_spec)
@@ -96,14 +98,15 @@ def main():
 
         sc = StandardScaler()
         pipelines = {
+            "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
             "DFE": Pipeline([("sc", sc), ("fs", DFE(clone(regr), base_score=0.9)), ("est", clone(est))]),
+            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(regr), verbose=1)), ("est", clone(est))]),
             "lap_score": Pipeline([("sc", sc), ("fs", fs_lap_score), ("est", clone(est))]),
             "SPEC": Pipeline([("sc", sc), ("fs", fs_SPEC), ("est", clone(est))]),
             "NDFS": Pipeline([("sc", sc), ("fs", fs_NDFS), ("est", clone(est))]),
             "UDFS": Pipeline([("sc", sc), ("fs", fs_UDFS), ("est", clone(est))]),
-            "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
-            "RFE": Pipeline([("sc", sc), ("fs", RFE(clone(regr), verbose=1)), ("est", clone(est))]),
-            "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
+            # "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
+            # "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
         }
 
         k_best_list = ["lap_score",
@@ -119,6 +122,8 @@ def main():
             # chosen by DFE
             if method in k_best_list:
                 setattr(pipeline.steps[1][1], "k", int(round(k_select)))
+            if method == 'RFE':
+                setattr(pipeline.steps[1][1], "n_features_to_select", int(round(k_select)))
 
             # cross validation
             scores = cross_validate(pipeline, X, y, n_jobs=n_jobs, cv=cv,
@@ -126,15 +131,15 @@ def main():
 
             # save results
             try:
-                n_features = [estimator.steps[-1][1].coef_.shape[1] for estimator in scores["estimator"]]
+                n_features = [estimator.steps[-1][1].coef_.shape[0] for estimator in scores["estimator"]]
             except:
                 n_features = [estimator.steps[-1][1].feature_importances_.shape[0] for estimator in scores["estimator"]]
 
             if method != 'NO-FS':
                 try:
-                    features = [estimator.steps[1][1].scores_ for estimator in scores["estimator"]]
-                except:
                     features = [estimator.steps[1][1].ranking_ for estimator in scores["estimator"]]
+                except:
+                    features = [estimator.steps[1][1].scores_ for estimator in scores["estimator"]]
             else:
                 features = [np.ones(n_features[0]).astype(int) for _ in range(len(n_features))]
 
