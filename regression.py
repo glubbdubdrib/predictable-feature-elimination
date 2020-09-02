@@ -32,10 +32,10 @@ X3, y3 = make_regression(n_samples=2600, n_features=500,
 datasets = [
     # "iris",
 
-    ["genreg-100", X1, y1],
-    ["genreg-300", X2, y2],
-    ["genreg-500", X3, y3],
-
+    # ["genreg-100", X1, y1],
+    # ["genreg-300", X2, y2],
+    # ["genreg-500", X3, y3],
+    'Mercedes_Benz_Greener_Manufacturing',
     # "yeast_ml8",                    # 2417 samples      116 features    2 classes
     # "scene",                        # 2407 samples      299 features    2 classes
     # "isolet",                       # 7797 samples      617 features    26 classes
@@ -63,7 +63,7 @@ datasets = [
 def main():
     # Cross-validation params
     cv = 10
-    n_jobs = 5
+    n_jobs = 3
     seed = 42
     results_dir = "./results/regression"
     if not os.path.isdir(results_dir):
@@ -74,7 +74,7 @@ def main():
     bar_position = 0
     progress_bar = tqdm(datasets, position=bar_position)
     for dataset in progress_bar:
-        dataset, X, y = dataset
+        # dataset, X, y = dataset
         progress_bar.set_description("Analysis of dataset: %s" % dataset)
 
         verbose_scores = pd.DataFrame()
@@ -83,8 +83,8 @@ def main():
         if not os.path.isdir(results_dir):
             os.makedirs(results_dir)
 
-        # X, y, n_classes = load_openml_dataset(dataset_name=dataset)
-        n_classes = len(set(y))
+        X, y, n_classes = load_openml_dataset(dataset_name=dataset)
+        # n_classes = len(set(y))
 
         # clf = RidgeClassifier(random_state=seed)
         regr = Ridge(random_state=seed)
@@ -105,8 +105,7 @@ def main():
             "SPEC": Pipeline([("sc", sc), ("fs", fs_SPEC), ("est", clone(est))]),
             "NDFS": Pipeline([("sc", sc), ("fs", fs_NDFS), ("est", clone(est))]),
             "UDFS": Pipeline([("sc", sc), ("fs", fs_UDFS), ("est", clone(est))]),
-            # "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
-            # "NO-FS": Pipeline([("sc", sc), ("est", clone(est))]),
+            "MCFS": Pipeline([("sc", sc), ("fs", fs_MCFS), ("est", clone(est))]),
         }
 
         k_best_list = ["lap_score",
@@ -130,18 +129,26 @@ def main():
                                     return_train_score=True, return_estimator=True)
 
             # save results
-            try:
-                n_features = [estimator.steps[-1][1].coef_.shape[0] for estimator in scores["estimator"]]
-            except:
-                n_features = [estimator.steps[-1][1].feature_importances_.shape[0] for estimator in scores["estimator"]]
+            n_features = []
+            features = []
+            for i, estimator in enumerate(scores["estimator"]):
+                if np.isnan(scores["test_score"][i]):
+                    n_features.append(-1)
+                    features.append(-1 * np.ones(X.shape[1]).astype(int))
+                    continue
 
-            if method != 'NO-FS':
                 try:
-                    features = [estimator.steps[1][1].ranking_ for estimator in scores["estimator"]]
+                    n_features.append(estimator.steps[-1][1].coef_.shape[0])
                 except:
-                    features = [estimator.steps[1][1].scores_ for estimator in scores["estimator"]]
-            else:
-                features = [np.ones(n_features[0]).astype(int) for _ in range(len(n_features))]
+                    n_features.append(estimator.steps[-1][1].feature_importances_.shape[0])
+
+                if method != 'NO-FS':
+                    try:
+                        features.append(estimator.steps[1][1].ranking_)
+                    except:
+                        features.append(estimator.steps[1][1].scores_)
+                else:
+                    features.append(np.ones(n_features[0]).astype(int))
 
             scores["n_features_selected"] = n_features
             scores["features_selected"] = features

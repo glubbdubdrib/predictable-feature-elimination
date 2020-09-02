@@ -61,6 +61,7 @@ class DFE(RFE):
         # compute correlation matrix
         # and sort feature by highest mean squared correlation
         C = np.square(np.corrcoef(X.T) - np.diag(np.ones(X.shape[1])))
+        C = np.nan_to_num(C, nan=1)
         coefs = C.mean(axis=1)
 
         # Get ranks
