@@ -1,6 +1,6 @@
 # Predictable Feature Elimination
 
-An unsupervised, model-agnostic, wrapper method for performing feature selection. A paper describing the approach has been submitted to [IJCAI-21](https://ijcai-21.org/).
+An unsupervised, model-agnostic, wrapper method for performing feature selection. Paper submitted to [IJCAI-21](https://ijcai-21.org/).
 
 We assume that if a feature can be predicted using the others, it adds little information to the problem, and therefore could be removed without impairing the performance of whatever model will be eventually built. The proposed method iteratively identifies and removes such predictable or nearly-predictable redundant feature, allowing to trade-off number of variables and quality. 
 
