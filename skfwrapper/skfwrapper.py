@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright 2020 Pietro Barbiero, Alberto Tonda and Giovanni Squillero
+# Licensed under the EUPL
+
 from skfeature.function.similarity_based import SPEC, lap_score
 from skfeature.function.sparse_learning_based import MCFS, NDFS, UDFS
 from skfeature.function.statistical_based import low_variance
