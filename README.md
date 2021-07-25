@@ -7,5 +7,4 @@ We propose an unsupervised, model-agnostic, wrapper method for feature selection
 The approach do not rely on target labels nor values, and the model used to identify predictable features is not related to the final use of the feature set. Therefore, it can be exploited for supervised, unsupervised, or semi-supervised problems, or even as a safe, pre-processing step to improve the quality of the results of other feature selection techniques.
 
 > **Copyright (c) 2020 [Pietro Barbiero](https://github.com/pietrobarbiero), [Giovanni Squillero](https://github.com/squillero), and [Alberto Tonda](https://github.com/albertotonda)**  
-> Licensed under the EUPL. See [https://eupl.eu/](https://eupl.eu/) for details.
-
+> Licensed under the [EUPL](https://eupl.eu/).
